@@ -28,7 +28,7 @@ var electroFiltro1 = electroDatos.map(arr => [
   arr[10].length
 ]);
 
-var electroFiltro2 = electroFiltro1.filter(hola => hola[0] < 90 && hola[0] > -90 && hola[1] < 180 && hola[1] > -180);
+var electroFiltro2 = electroFiltro1.filter(lonlat => lonlat[0] < 90 && lonlat[0] > -90 && lonlat[1] < 180 && lonlat[1] > -180);
 
 // Para enlazar los objetos "electroDatos" y "connectors" mediante los ID, usamos una función que
 // recorre "electroFiltro" y devuelve el valor de "connectors" correspondiente:

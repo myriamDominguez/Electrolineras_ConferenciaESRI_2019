@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <title>Highlight point features - 4.13</title>
+
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.13/esri/themes/light/main.css"
+    />
+    <script src="https://js.arcgis.com/4.13/"></script>
+    <style>
+      html,
+      body,
+      #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+      }
+
+      #paneDiv {
+        position: absolute;
+        bottom: 40px;
+        width: 100%;
+        text-align: center;
+        background-color: transparent;
+        color: white;
+      }
+
+      .esri-button-overwrite {
+        width: auto;
+        display: table-cell;
+        margin: 4px;
+        background-color: white;
+        color: #0079c1;
+      }
+    </style>
+    <script>
+      require(["esri/Map", "esri/WebMap", "esri/views/MapView"], function(
+        Map,
+        WebMap,
+        MapView
+      ) {
+        // load webMap from portal item
+        var WebMap = new WebMap({
+          portalItem: {
+            // autocasts as new PortalItem()
+            id: "a9229db1b8ef4bb09f37dbe17079ed2f"
+          }
+        });
+
+        var view = new MapView({
+          map: WebMap,
+          container: "viewDiv",
+          zoom: 9,
+          center: [-3.69, 40.42],
+          // set highlightOptions like color and fillOpacity
+          highlightOptions: {
+            color: [255, 241, 58],
+            fillOpacity: 0.4
+          }
+        });
+
+        // these two highlight handlers are used for selection and hovering over features
+        var highlightSelect;
+        var highlightHover;
+
+        // initialize AbortController
+        const controller = new AbortController();
+        const signal = controller.signal;
+
+        WebMap.when(function() {
+          // get layer from WebMap
+          var stationLayer = WebMap.layers.getItemAt(0);
+
+          // highlight is set on the layerView, so we need to detect when the layerView is ready
+          view.whenLayerView(stationLayer).then(function(layerView) {
+            // creates the query that will be used to obtain the features needed for the highlight
+            var queryStations = stationLayer.createQuery();
+            // features that are passed in the highlight function need to have an `objectID`
+            // if the query is built using `new Query()` then `queryStations.outFields = ["objectID"]` should be set
+
+            var buttons = document.querySelectorAll("button");
+            for (var i = 0, button = null; (button = buttons[i]); i++) {
+              button.addEventListener("click", onClick);
+              button.addEventListener("mouseover", onMouseOver);
+              button.addEventListener("mouseout", onMouseOut);
+            }
+
+            function onClick(event) {
+
+              queryStations.where = `NUM_CONNECTORS=${parseInt(event.target.innerText)} AND CONNECTORS NOT LIKE '%Schuko%'`;
+              stationLayer.queryFeatures(queryStations).then(function(results) {
+                // if a feature is already highlighted, then remove the highlight
+                if (highlightSelect) {
+                  highlightSelect.remove();
+                }
+
+                // the features to be highlighted
+                var features = results.features;
+
+                // use the objectID to highlight the feature
+                highlightSelect = layerView.highlight(
+                  features.map(feature => feature.attributes["OBJECTID"])
+                );
+
+                // center the feature
+                // view.goTo(
+                //   {
+                //     target: feature.geometry,
+                //     tilt: 70
+                //   },
+                //   {
+                //     duration: 2000,
+                //     easing: "in-out-expo"
+                //   }
+                // );
+              });
+            }
+
+            function onMouseOver(event) {
+              queryStations.where = "nom='" + event.target.innerText + "'";
+              // pass AbortController signal to call
+              stationLayer
+                .queryFeatures(queryStations, { signal })
+                .then(function(result) {
+                  if (highlightHover) {
+                    highlightHover.remove();
+                  }
+                  var feature = result.features[0];
+                  highlightHover = layerView.highlight(
+                    feature.attributes["OBJECTID"]
+                  );
+                });
+            }
+
+            function onMouseOut(event) {
+              // abort queryFeatures that retrieves the hovered feature
+              controller.abort();
+              if (highlightHover) {
+                highlightHover.remove();
+              }
+            }
+          });
+        });
+      });
+    </script>
+  </head>
+
+  <body>
+    <div id="viewDiv"></div>
+    <div id="paneDiv" class="esri-widget">
+      <h3>Subway stations</h3>
+      <button class="esri-button esri-button-overwrite">1</button>
+      <button class="esri-button esri-button-overwrite">2</button>
+      <button class="esri-button esri-button-overwrite">3</button>
+
+    </div>
+  </body>
+</html>

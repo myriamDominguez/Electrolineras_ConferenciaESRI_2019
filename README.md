@@ -10,4 +10,6 @@ Los ejemplos aplicados para la creación del mapa con las electrolineras y el á
 
 En el documento HTML "index.html" se encuentra el código final del mapa con las electrolineras.
 
-Myriam Domínguez del Río. Linkedin: https://www.linkedin.com/in/myriam-dom%C3%ADnguez-del-r%C3%ADo-71931a167/
+Para cualquier duda contactar con Myriam Domínguez del Río:
+- Correo: myriamlarson@gmail.com
+- Linkedin: https://www.linkedin.com/in/myriam-dom%C3%ADnguez-del-r%C3%ADo-71931a167/

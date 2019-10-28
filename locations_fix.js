@@ -42,15 +42,3 @@ function translateConnectorIDs(arr){
 // por consola las cabeceras y el objeto final:
 console.log("LAT;LON;OBJECT_ID;CONNECTORS;NUM_CONNECTORS");
 electroFiltro2.map(arr => console.log(`${arr.join(';')}`));
-
-// var options = {
-//   rowDelimiter: ';';
-// }
-// jsonexport(electroFiltro,function(err, csv){
-//     if(err) return console.log(err);
-//     console.log(csv);
-// });
-
-
-// Para imprimir TODAS las lineas por consola:
-// electroDatos.map(el => console.log(el));

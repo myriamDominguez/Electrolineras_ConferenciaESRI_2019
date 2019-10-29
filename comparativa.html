@@ -6,163 +6,40 @@
       name="viewport"
       content="initial-scale=1,maximum-scale=1,user-scalable=no"
     />
-    <title>Query features from a FeatureLayerView - 4.13</title>
+    <title>Highlight point features - 4.13</title>
 
     <link
       rel="stylesheet"
       href="https://js.arcgis.com/4.13/esri/themes/light/main.css"
     />
     <script src="https://js.arcgis.com/4.13/"></script>
-
-    <script>
-      require([
-        "esri/Map",
-        "esri/views/MapView",
-        "esri/layers/FeatureLayer"
-      ], function(Map, MapView, FeatureLayer) {
-        const map = new Map({
-          basemap: "dark-gray"
-        });
-
-        const view = new MapView({
-          container: "sceneDiv",
-          map: map,
-          center: [-73.95, 40.702],
-          zoom: 13,
-          padding: {
-            right: 300
-          }
-        });
-
-        const listNode = document.getElementById("nyc_graphics");
-
-        /********************
-         * Add feature layer *
-         ********************/
-
-        // Create the PopupTemplate
-        const popupTemplate = {
-          // autocasts as new PopupTemplate()
-          title: "{NAME} in {COUNTY}",
-          content: [
-            {
-              type: "fields",
-              fieldInfos: [
-                {
-                  fieldName: "B12001_calc_pctMarriedE",
-                  label: "% Married",
-                  format: {
-                    places: 0,
-                    digitSeparator: true
-                  }
-                },
-                {
-                  fieldName: "B12001_calc_numMarriedE",
-                  label: "Total Married",
-                  format: {
-                    places: 0,
-                    digitSeparator: true
-                  }
-                },
-                {
-                  fieldName: "B12001_calc_numNeverE",
-                  label: "Never Married",
-                  format: {
-                    places: 0,
-                    digitSeparator: true
-                  }
-                },
-                {
-                  fieldName: "B12001_calc_numDivorcedE",
-                  label: "Total Divorced",
-                  format: {
-                    places: 0,
-                    digitSeparator: true
-                  }
-                }
-              ]
-            }
-          ]
-        };
-
-        // Create the FeatureLayer using the popupTemplate
-        const featureLayer = new FeatureLayer({
-          url:
-            "https://services.arcgis.com/P3ePLMYs2RVChkJx/ArcGIS/rest/services/ACS_Marital_Status_Boundaries/FeatureServer/2",
-          outFields: ["NAME"], // used by queryFeatures
-          popupTemplate: popupTemplate
-        });
-        map.add(featureLayer);
-
-        let graphics;
-
-        view.whenLayerView(featureLayer).then(function(layerView) {
-          layerView.watch("updating", function(value) {
-            if (!value) {
-              // wait for the layer view to finish updating
-
-              // query all the features available for drawing.
-              layerView
-                .queryFeatures({
-                  geometry: view.extent,
-                  returnGeometry: true
-                })
-                .then(function(results) {
-                  graphics = results.features;
-
-                  const fragment = document.createDocumentFragment();
-
-                  graphics.forEach(function(result, index) {
-                    const attributes = result.attributes;
-                    const name = attributes.NAME;
-
-                    // Create a list zip codes in NY
-                    const li = document.createElement("li");
-                    li.classList.add("panel-result");
-                    li.tabIndex = 0;
-                    li.setAttribute("data-result-id", index);
-                    li.textContent = name;
-
-                    fragment.appendChild(li);
-                  });
-                  // Empty the current list
-                  listNode.innerHTML = "";
-                  listNode.appendChild(fragment);
-                })
-                .catch(function(error) {
-                  console.error("query failed: ", error);
-                });
-            }
-          });
-        });
-
-        // listen to click event on the zip code list
-        listNode.addEventListener("click", onListClickHandler);
-
-        function onListClickHandler(event) {
-          const target = event.target;
-          const resultId = target.getAttribute("data-result-id");
-
-          // get the graphic corresponding to the clicked zip code
-          const result =
-            resultId && graphics && graphics[parseInt(resultId, 10)];
-
-          if (result) {
-            // open the popup at the centroid of zip code polygon
-            // and set the popup's features which will populate popup content and title.
-
-            view.goTo(result.geometry.extent.expand(2)).then(function() {
-              view.popup.open({
-                features: [result],
-                location: result.geometry.centroid
-              });
-            });
-          }
-        }
-      });
-    </script>
-
     <style>
+      html,
+      body,
+      #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+      }
+
+      #paneDiv {
+        visibility: hidden;
+        position: absolute;
+        bottom: 40px;
+        width: 100%;
+        text-align: center;
+        background-color: transparent;
+        color: white;
+      }
+
+      .esri-button-overwrite {
+        width: auto;
+        display: table-cell;
+        margin: 4px;
+        background-color: white;
+        color: #0079c1;
+      }
       html,
       body,
       #sceneDiv {
@@ -181,13 +58,13 @@
       .panel-side {
         padding: 2px;
         box-sizing: border-box;
-        width: 300px;
+        width: 236px;
         height: 100%;
         position: absolute;
         top: 0;
         right: 0;
         color: #fff;
-        background-color: rgba(0, 0, 0, 0.6);
+        background-color: rgba(0, 0, 0, 0.5);
         overflow: auto;
         z-index: 60;
       }
@@ -220,17 +97,241 @@
         background-color: rgba(0, 0, 0, 0.75);
       }
     </style>
+    <script>
+      require(["esri/Map",
+      "esri/WebMap",
+      "esri/views/MapView",
+      "esri/tasks/ServiceAreaTask",
+      "esri/tasks/support/ServiceAreaParameters",
+      "esri/tasks/support/FeatureSet",
+      "esri/Graphic"], function(
+        Map,
+        WebMap,
+        MapView,
+        ServiceAreaTask,
+        ServiceAreaParameters,
+        FeatureSet,
+        Graphic
+      ) {
+        // load webMap from portal item
+        var webMap = new WebMap({
+          portalItem: {
+            // autocasts as new PortalItem()
+            id: "a9229db1b8ef4bb09f37dbe17079ed2f"
+          }
+        });
+
+        var view = new MapView({
+          map: webMap,
+          container: "viewDiv",
+          zoom: 9,
+          center: [-3.69, 40.42],
+          // set highlightOptions like color and fillOpacity
+          highlightOptions: {
+            color: [255, 241, 58],
+            fillOpacity: 0.4
+          }
+        });
+
+        // these two highlight handlers are used for selection and hovering over features
+        var highlightSelect;
+        var highlightHover;
+        // these last one is used for selecting "electrolineras" points
+        var highlightDrive;
+
+        // initialize AbortController
+        const controller = new AbortController();
+        const signal = controller.signal;
+
+        webMap.when(function() {
+          // get layer from WebMap
+          var electroLayer = webMap.layers.getItemAt(0);
+          window.tipo_enchufe = "";
+
+          // visible / hidden "panel enchufes"
+          var panel_enchufes = document.getElementById('paneDiv');
+          var btn_enchufes = document.getElementById('vista_enchufes_btn');
+          btn_enchufes.addEventListener('click', (event) => {
+            if(panel_enchufes.style.visibility === 'hidden') {
+              panel_enchufes.style.visibility = 'visible';
+            } else {
+              panel_enchufes.style.visibility = 'hidden';
+            }
+          })
+
+          // highlight is set on the layerView, so we need to detect when the layerView is ready
+          view.whenLayerView(electroLayer).then(function(layerView) {
+            // creates the query that will be used to obtain the features needed for the highlight
+            var queryStations = electroLayer.createQuery();
+            // features that are passed in the highlight function need to have an `objectID`
+            // if the query is built using `new Query()` then `queryStations.outFields = ["objectID"]` should be set
+
+            var buttons = document.querySelectorAll("button");
+            for (var i = 0, button = null; (button = buttons[i]); i++) {
+              button.addEventListener("click", onClick);
+              button.addEventListener("mouseover", onMouseOver);
+              button.addEventListener("mouseout", onMouseOut);
+            }
+
+            function onClick(event) {
+              queryStations.where = `CONNECTORS LIKE '%${event.target.innerText}%'`;
+              tipo_enchufe = event.target.innerText;
+              electroLayer.queryFeatures(queryStations).then(function(results) {
+                // if a feature is already highlighted, then remove the highlight
+                if (highlightSelect) {
+                  highlightSelect.remove();
+                }
+
+                // the features to be highlighted
+                var features = results.features;
+
+                // use the objectID to highlight the feature
+                highlightSelect = layerView.highlight(
+                  features.map(feature => feature.attributes["OBJECTID"])
+                );
+              });
+            }
+
+            function onMouseOver(event) {
+              queryStations.where = "CONNECTORS'" + event.target.innerText + "'";
+              // pass AbortController signal to call
+              electroLayer
+                .queryFeatures(queryStations, { signal })
+                .then(function(result) {
+                  if (highlightHover) {
+                    highlightHover.remove();
+                  }
+                  var feature = result.features[0];
+                  highlightHover = layerView.highlight(
+                    feature.attributes["OBJECTID"]
+                  );
+                });
+            }
+
+            function onMouseOut(event) {
+              // abort queryFeatures that retrieves the hovered feature
+              controller.abort();
+              if (highlightHover) {
+                highlightHover.remove();
+              }
+            }
+          });
+        });
+
+        // create the Service Area Task
+        var serviceAreaTask = new ServiceAreaTask({
+        url: "https://route.arcgis.com/arcgis/rest/services/World/ServiceAreas/NAServer/ServiceArea_World/solveServiceArea"
+        });
+
+        function createGraphic(point) {
+        // Remove any existing graphics
+        view.graphics.removeAll();
+        // Create a and add the point on the map
+        var graphic = new Graphic({
+          geometry: point,
+          symbol: {
+            type: "simple-marker",
+            color: "white",
+            size: 8
+          }
+        });
+        view.graphics.add(graphic);
+        return graphic;
+      };
+
+      view.on("click", function(event){
+        var locationGraphic = createGraphic(event.mapPoint);
+      });
+
+      function createServiceAreaParameters(locationGraphic, driveTimeCutoffs, outSpatialReference) {
+        // Create one or more locations (facilities) to solve for
+        var featureSet = new FeatureSet({
+          features: [locationGraphic]
+        });
+        // Set all of the input parameters for the service
+        var taskParameters = new ServiceAreaParameters({
+          facilities: featureSet, // Location(s) to start from
+          defaultBreaks: driveTimeCutoffs, // One or more drive time cutoff values
+          outSpatialReference: outSpatialReference // Spatial reference to match the view
+        });
+        return taskParameters;
+      }
+
+      view.on("click", function(event){
+       var locationGraphic = createGraphic(event.mapPoint);
+       //*** ADD ***//
+       var driveTimeCutoffs = [10]; // Minutes (default)
+       var ServiceAreaParameters = createServiceAreaParameters(locationGraphic, driveTimeCutoffs, view.spatialReference);
+     });
+
+     function executeServiceAreaTask(ServiceAreaParameters) {
+        return serviceAreaTask.solve(ServiceAreaParameters)
+          .then(function(result){
+            if (result.serviceAreaPolygons.length) {
+              // Draw each service area polygon
+              result.serviceAreaPolygons.forEach(function(areaPolygon){
+
+                areaPolygon.symbol = {
+                  type: "simple-fill",
+                  color: "rgba(255,50,50,.1)"
+                }
+                if(highlightSelect){
+                  highlightSelect.remove();
+                }
+
+                view.graphics.add(areaPolygon,0);
+                // Identificar electrolineras dentro de areaPolygon
+                var electrolinerasLayerView = view.layerViews.getItemAt(0);
+                electrolinerasLayerView.queryFeatures({
+                  where : `CONNECTORS LIKE '%${tipo_enchufe}%'`,
+                  geometry: areaPolygon.geometry,
+                  returnGeometry: true
+                }).then(function(intersectElectrolineras) {
+                  if (highlightDrive) {
+                    highlightDrive.remove();
+                  }
+                  highlightDrive = electrolinerasLayerView.highlight(
+                    intersectElectrolineras.features.map(feature => feature.attributes["OBJECTID"])
+                  );
+
+                })
+
+              });
+            }
+          }, function(error){
+            console.log(error);
+          });
+      }
+
+      view.on("click", function(event){
+        var locationGraphic = createGraphic(event.mapPoint);
+        var driveTimeCutoffs = [20]; // Minutes (default)
+        var ServiceAreaParameters = createServiceAreaParameters(locationGraphic, driveTimeCutoffs, view.spatialReference);
+        //*** ADD ***//
+        executeServiceAreaTask(ServiceAreaParameters);
+      });
+
+      });
+    </script>
   </head>
 
   <body>
     <div class="panel-container">
       <div class="panel-side esri-widget">
-        <h3>Marriage by Census Tract</h3>
-        <ul id="nyc_graphics">
-          <li>Loading&hellip;</li>
-        </ul>
+        <button class="esri-button esri-button-overwrite" id="vista_enchufes_btn">Tipos de Enchufe</button>
+        <button class="esri-button esri-button-overwrite" id="drive_time_button">Drive Time</button>
       </div>
-      <div id="sceneDiv"></div>
+      <div id="viewDiv"></div>
+    </div>
+    <div id="paneDiv" class="esri-widget">
+      <h3>Electrolineras</h3>
+      <button class="esri-button esri-button-overwrite">Schuko</button>
+      <button class="esri-button esri-button-overwrite">Type 2</button>
+      <button class="esri-button esri-button-overwrite">Type 1</button>
+      <button class="esri-button esri-button-overwrite">CCS2</button>
+      <button class="esri-button esri-button-overwrite">CHAdeMO</button>
+      <button class="esri-button esri-button-overwrite">Tesla</button>
+      <button class="esri-button esri-button-overwrite">Tesla Supercharger</button>
     </div>
   </body>
 </html>
